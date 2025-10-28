@@ -1,0 +1,218 @@
+{
+  "timestamp": "2025-10-27T22:43:31.399749",
+  "total_tests": 42,
+  "passed_tests": 40,
+  "success_rate": 95.23809523809523,
+  "results": [
+    {
+      "test": "User Registration",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Admin Login",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Get Current User",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Create Calendar Event",
+      "success": false,
+      "details": "Expected 200, got 422 - [{'type': 'missing', 'loc': ['body', 'fecha_inicio'], 'msg': 'Field required', 'input': {'title': 'Test Event', 'description': 'Test event description', 'date': '2024-12-25', 'event_type': 'pedido', 'custom_fields': {'numero_pedido': 'PED-001', 'cliente': 'Test Client'}}, 'url': 'https://errors.pydantic.dev/2.12/v/missing'}, {'type': 'missing', 'loc': ['body', 'fecha_fin'], 'msg': 'Field required', 'input': {'title': 'Test Event', 'description': 'Test event description', 'date': '2024-12-25', 'event_type': 'pedido', 'custom_fields': {'numero_pedido': 'PED-001', 'cliente': 'Test Client'}}, 'url': 'https://errors.pydantic.dev/2.12/v/missing'}, {'type': 'missing', 'loc': ['body', 'event_type_id'], 'msg': 'Field required', 'input': {'title': 'Test Event', 'description': 'Test event description', 'date': '2024-12-25', 'event_type': 'pedido', 'custom_fields': {'numero_pedido': 'PED-001', 'cliente': 'Test Client'}}, 'url': 'https://errors.pydantic.dev/2.12/v/missing'}]"
+    },
+    {
+      "test": "Create Kanban Task",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Get Kanban Tasks",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Update Kanban Task",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Delete Kanban Task",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Create Task Type (Admin)",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Get Task Types",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Update Task Type (Admin)",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Update Task Type (Unauthorized)",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Create Kanban Task with Type",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Create Kanban Task without Type",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Update Kanban Task with Type",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Get Kanban Tasks with Types",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Create Task Type for Delete Test",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Delete Task Type (Unauthorized)",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Cleanup Delete Task Type",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Delete Task Type with Associated Tasks",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Create Task Type (Unauthorized)",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Regular User Login",
+      "success": false,
+      "details": "Expected 200, got 401 - Incorrect email or password"
+    },
+    {
+      "test": "Get Users (Admin)",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Get Users Structure Check",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Create User (Admin)",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Update User (Admin)",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Update User with Password (Admin)",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Update User without Password (Admin)",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Delete User (Admin)",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Get Users After Delete",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Create User (Duplicate Email)",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Update User (Not Found)",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Delete User (Not Found)",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Create User (Unauthorized - Regular User)",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Update User (Unauthorized)",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Create User for Delete Test",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Delete User (Unauthorized)",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Cleanup Delete User",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Create User (No Auth)",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Get Users (Unauthorized)",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Cleanup Typed Task",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Cleanup Untyped Task",
+      "success": true,
+      "details": ""
+    }
+  ]
+}
