@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { Plus, Trash2 } from 'lucide-react';
@@ -29,6 +30,7 @@ const EventDialog = ({ open, onClose, onSave, onDelete, editingEvent, eventTypes
   const [orders, setOrders] = useState([]);
   const [customFieldKey, setCustomFieldKey] = useState('');
   const [customFieldValue, setCustomFieldValue] = useState('');
+  const [markAsPending, setMarkAsPending] = useState(false);
 
   useEffect(() => {
     loadOrders();
@@ -40,6 +42,8 @@ const EventDialog = ({ open, onClose, onSave, onDelete, editingEvent, eventTypes
       const selectedType = eventTypes.find(t => t.id === editingEvent.event_type_id);
       const category = selectedType?.category || 'event';
       setSelectedCategory(category);
+      const isPendingFlag = Boolean(editingEvent.custom_fields?.is_pending);
+      setMarkAsPending(isPendingFlag);
       
       setFormData({
         title: editingEvent.title,
@@ -71,6 +75,7 @@ const EventDialog = ({ open, onClose, onSave, onDelete, editingEvent, eventTypes
   const resetForm = () => {
     setSelectedCategory('event'); // Reset categoría
     const firstEventTypeOfCategory = eventTypes.find(t => (t.category || 'event') === 'event');
+    setMarkAsPending(false);
     
     setFormData({
       title: '',
@@ -109,7 +114,7 @@ const EventDialog = ({ open, onClose, onSave, onDelete, editingEvent, eventTypes
   const buildPayload = () => {
     const payload = {
       ...formData,
-      custom_fields: formData.custom_fields || {},
+      custom_fields: { ...(formData.custom_fields || {}) },
     };
 
     // Normalizar campos opcionales ('' -> null)
@@ -125,6 +130,21 @@ const EventDialog = ({ open, onClose, onSave, onDelete, editingEvent, eventTypes
     } else {
       const parsedAmount = parseFloat(payload.amount);
       payload.amount = Number.isFinite(parsedAmount) ? parsedAmount : null;
+    }
+
+    // Gestionar flag de pendiente para eventos
+    if (selectedCategory === 'event') {
+      if (markAsPending) {
+        payload.custom_fields.is_pending = true;
+      } else {
+        if (payload.custom_fields && 'is_pending' in payload.custom_fields) {
+          const { is_pending, ...rest } = payload.custom_fields;
+          payload.custom_fields = Object.keys(rest).length ? rest : {};
+        }
+      }
+    } else if (payload.custom_fields && 'is_pending' in payload.custom_fields) {
+      const { is_pending, ...rest } = payload.custom_fields;
+      payload.custom_fields = Object.keys(rest).length ? rest : {};
     }
 
     // Si la categoría es "event", limpiar campos específicos de pedidos
@@ -242,6 +262,7 @@ const EventDialog = ({ open, onClose, onSave, onDelete, editingEvent, eventTypes
                   checked={selectedCategory === 'event'}
                   onChange={(e) => {
                     setSelectedCategory(e.target.value);
+                    setMarkAsPending(false);
                     // Reset tipo de evento cuando cambia categoría
                     const firstType = eventTypes.find(t => (t.category || 'event') === 'event');
                     setFormData({ ...formData, event_type_id: firstType?.id || '' });
@@ -258,6 +279,7 @@ const EventDialog = ({ open, onClose, onSave, onDelete, editingEvent, eventTypes
                   checked={selectedCategory === 'document'}
                   onChange={(e) => {
                     setSelectedCategory(e.target.value);
+                    setMarkAsPending(false);
                     // Reset tipo de evento cuando cambia categoría
                     const firstType = eventTypes.find(t => (t.category || 'event') === 'document');
                     setFormData({ ...formData, event_type_id: firstType?.id || '' });
@@ -268,12 +290,28 @@ const EventDialog = ({ open, onClose, onSave, onDelete, editingEvent, eventTypes
               </label>
             </div>
             <p className="text-xs text-gray-500">
-              {selectedCategory === 'document' 
+              {selectedCategory === 'document'
                 ? 'Los documentos incluyen pedidos, albaranes, facturas, etc.'
                 : 'Los eventos incluyen reuniones, viajes, citas, etc.'}
             </p>
           </div>
-          
+
+          {selectedCategory === 'event' && (
+            <div className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+              <div>
+                <Label className="text-sm font-medium text-gray-800">Marcar como pendiente</Label>
+                <p className="text-xs text-gray-500">
+                  El evento aparecerá en el lateral hasta que lo marques como resuelto.
+                </p>
+              </div>
+              <Switch
+                checked={markAsPending}
+                onCheckedChange={(checked) => setMarkAsPending(checked)}
+                data-testid="event-mark-pending-switch"
+              />
+            </div>
+          )}
+
           <div className="space-y-2">
             <Label htmlFor="event_type_id">Tipo de {selectedCategory === 'document' ? 'Documento' : 'Evento'}</Label>
             {eventTypes.length > 0 ? (

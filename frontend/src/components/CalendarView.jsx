@@ -68,6 +68,7 @@ const CalendarView = ({ user }) => {
     try {
       const response = await axiosInstance.get('/orders');
       setOrders(response.data);
+      window.dispatchEvent(new Event('orders:refresh'));
     } catch (error) {
       console.error('Error al cargar pedidos:', error);
     }

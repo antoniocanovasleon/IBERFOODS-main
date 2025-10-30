@@ -3,15 +3,28 @@ import { axiosInstance } from '@/App';
 import { Card, CardContent } from '@/components/ui/card';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { toast } from 'sonner';
-import { Package, Trash2, FileText } from 'lucide-react';
+import { Package, Trash2, FileText, CalendarClock } from 'lucide-react';
 
 const OrdersSidebar = () => {
   const [orders, setOrders] = useState([]);
   const [linkedEvents, setLinkedEvents] = useState({});
   const [loadingEvents, setLoadingEvents] = useState({});
+  const [pendingEvents, setPendingEvents] = useState([]);
+  const [resolvingPending, setResolvingPending] = useState({});
 
   useEffect(() => {
     loadOrders();
+    loadPendingEvents();
+
+    const handleRefresh = () => {
+      loadOrders();
+      loadPendingEvents();
+    };
+
+    window.addEventListener('orders:refresh', handleRefresh);
+    return () => {
+      window.removeEventListener('orders:refresh', handleRefresh);
+    };
   }, []);
 
   const loadOrders = async () => {
@@ -21,6 +34,15 @@ const OrdersSidebar = () => {
     } catch (error) {
       console.error('Error loading orders:', error);
       toast.error('Error al cargar pedidos');
+    }
+  };
+
+  const loadPendingEvents = async () => {
+    try {
+      const response = await axiosInstance.get('/pending-events');
+      setPendingEvents(response.data);
+    } catch (error) {
+      console.error('Error loading pending events:', error);
     }
   };
 
@@ -53,8 +75,22 @@ const OrdersSidebar = () => {
     }
   };
 
-  if (orders.length === 0) {
-    return null; // No mostrar nada si no hay pedidos
+  const handleResolvePending = async (eventId) => {
+    setResolvingPending(prev => ({ ...prev, [eventId]: true }));
+    try {
+      await axiosInstance.post(`/pending-events/${eventId}/resolve`);
+      toast.success('Evento marcado como resuelto');
+      loadPendingEvents();
+    } catch (error) {
+      console.error('Error resolving pending event:', error);
+      toast.error('No se pudo marcar como resuelto');
+    } finally {
+      setResolvingPending(prev => ({ ...prev, [eventId]: false }));
+    }
+  };
+
+  if (orders.length === 0 && pendingEvents.length === 0) {
+    return null; // No mostrar nada si no hay pedidos ni eventos pendientes
   }
 
   return (
@@ -66,7 +102,7 @@ const OrdersSidebar = () => {
         </h3>
         <p className="text-xs text-gray-500 mt-1">{orders.length} {orders.length === 1 ? 'pedido' : 'pedidos'}</p>
       </div>
-      
+
       <div className="space-y-2 px-4 max-h-64 overflow-y-auto">
         {orders.map((order) => (
           <Popover key={order.id} onOpenChange={(open) => {
@@ -158,6 +194,38 @@ const OrdersSidebar = () => {
           </Popover>
         ))}
       </div>
+
+      {pendingEvents.length > 0 && (
+        <div className="mt-4 px-4">
+          <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+            <CalendarClock className="h-4 w-4" />
+            Eventos pendientes
+          </h3>
+          <p className="text-xs text-gray-500 mt-1">{pendingEvents.length} {pendingEvents.length === 1 ? 'evento' : 'eventos'}</p>
+
+          <div className="space-y-2 mt-2">
+            {pendingEvents.map((event) => (
+              <Card key={event.id} className="border-l-4 border-l-amber-500 bg-amber-50/70">
+                <CardContent className="p-3 flex items-start justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-amber-900 truncate">{event.title}</p>
+                    <p className="text-xs text-amber-700 truncate">{event.description || 'Sin descripción'}</p>
+                  </div>
+                  <button
+                    onClick={() => handleResolvePending(event.id)}
+                    className="p-1 hover:bg-amber-100 rounded transition-colors flex-shrink-0"
+                    disabled={resolvingPending[event.id]}
+                    data-testid={`resolve-pending-${event.id}`}
+                    aria-label="Marcar como resuelto"
+                  >
+                    <Trash2 className={`h-3.5 w-3.5 ${resolvingPending[event.id] ? 'text-amber-400' : 'text-amber-600'}`} />
+                  </button>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

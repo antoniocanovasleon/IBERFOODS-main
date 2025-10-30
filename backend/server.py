@@ -413,6 +413,9 @@ async def delete_task_type(type_id: str, current_user: User = Depends(get_admin_
 async def create_event(event_data: CalendarEventCreate, current_user: User = Depends(get_current_user)):
     data = event_data.model_dump()
     data['created_by'] = current_user.id
+
+    if data.get('custom_fields') is None:
+        data['custom_fields'] = {}
     
     # Convert empty strings to None for optional fields
     for field in ['order_number', 'client', 'supplier', 'amount', 'linked_order_id']:
@@ -422,12 +425,12 @@ async def create_event(event_data: CalendarEventCreate, current_user: User = Dep
     # Crear evento en calendar_events
     result = supabase.table('calendar_events').insert(data).execute()
     created_event = result.data[0]
-    
+
     # Si el evento es tipo "Pedido" o "Factura Proforma", crear entrada en orders
     event_type_result = supabase.table('event_types').select('name').eq('id', data['event_type_id']).execute()
     if event_type_result.data:
         event_type_name = event_type_result.data[0]['name']
-        
+
         if event_type_name in ['Pedido', 'Factura Proforma']:
             order_data = {
                 'calendar_event_id': created_event['id'],
@@ -468,6 +471,9 @@ async def update_event(
     current_user: User = Depends(get_current_user)
 ):
     update_data = event_data.model_dump()
+
+    if update_data.get('custom_fields') is None:
+        update_data['custom_fields'] = {}
     
     # Convert empty strings to None for optional fields
     for field in ['order_number', 'client', 'supplier', 'amount', 'linked_order_id']:
@@ -537,6 +543,38 @@ async def delete_event(event_id: str, current_user: User = Depends(get_current_u
         raise HTTPException(status_code=404, detail="Event not found")
     
     return {"message": "Event deleted successfully"}
+
+
+@api_router.get("/pending-events", response_model=List[CalendarEvent])
+async def get_pending_events(current_user: User = Depends(get_current_user)):
+    # Buscar eventos cuyo custom_fields->>is_pending sea 'true'
+    result = supabase.table('calendar_events').select('*').filter('custom_fields->>is_pending', 'eq', 'true').execute()
+
+    pending_events = result.data if result.data else []
+
+    # Compatibilidad: si se guardó como boolean JSON true, fallback con contains
+    if not pending_events:
+        alt_result = supabase.table('calendar_events').select('*').contains('custom_fields', {'is_pending': True}).execute()
+        pending_events = alt_result.data if alt_result.data else []
+
+    return pending_events
+
+
+@api_router.post("/pending-events/{event_id}/resolve")
+async def resolve_pending_event(event_id: str, current_user: User = Depends(get_current_user)):
+    event_result = supabase.table('calendar_events').select('custom_fields').eq('id', event_id).execute()
+    if not event_result.data:
+        raise HTTPException(status_code=404, detail="Event not found")
+
+    custom_fields = event_result.data[0].get('custom_fields') or {}
+    if 'is_pending' in custom_fields:
+        custom_fields.pop('is_pending')
+
+    result = supabase.table('calendar_events').update({'custom_fields': custom_fields}).eq('id', event_id).execute()
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Event not found")
+
+    return {"message": "Pending flag removed"}
 
 # Kanban routes
 @api_router.post("/kanban", response_model=KanbanTask)
