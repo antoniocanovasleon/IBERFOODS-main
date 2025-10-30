@@ -37,14 +37,14 @@ const AuthPage = ({ onLogin }) => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
+    <div className="min-h-screen flex items-center justify-center px-4 py-6 sm:py-10 bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-900 dark:via-slate-950 dark:to-slate-900">
       <div className="w-full max-w-md animate-fade-in">
-        <Card className="glass shadow-2xl border-none" data-testid="auth-card">
-          <CardHeader className="text-center">
-            <CardTitle className="text-4xl font-bold bg-gradient-to-r from-teal-600 to-cyan-600 bg-clip-text text-transparent">
+        <Card className="glass shadow-2xl border border-white/40 backdrop-blur" data-testid="auth-card">
+          <CardHeader className="text-center space-y-2">
+            <CardTitle className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-teal-600 to-cyan-600 bg-clip-text text-transparent">
               {isLogin ? 'Bienvenido' : 'Crear Cuenta'}
             </CardTitle>
-            <CardDescription className="text-base">
+            <CardDescription className="text-sm sm:text-base text-gray-600">
               {isLogin ? 'Ingresa tus credenciales' : 'Registra tu cuenta nueva'}
             </CardDescription>
           </CardHeader>
@@ -94,7 +94,7 @@ const AuthPage = ({ onLogin }) => {
               <Button
                 type="submit"
                 data-testid="auth-submit-button"
-                className="w-full bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 text-white font-medium py-6 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300"
+                className="w-full bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 text-white font-medium py-4 sm:py-5 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 text-sm sm:text-base"
                 disabled={loading}
               >
                 {loading ? (
@@ -115,7 +115,7 @@ const AuthPage = ({ onLogin }) => {
                 type="button"
                 data-testid="auth-toggle-button"
                 onClick={() => setIsLogin(!isLogin)}
-                className="text-teal-600 hover:text-teal-700 font-medium transition-colors"
+                className="text-teal-600 hover:text-teal-700 font-medium transition-colors text-sm sm:text-base"
               >
                 {isLogin ? '¿No tienes cuenta? Regístrate' : '¿Ya tienes cuenta? Inicia sesión'}
               </button>

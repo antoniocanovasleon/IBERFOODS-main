@@ -12,13 +12,12 @@ import { Plus, Trash2, Edit } from 'lucide-react';
 import {
   DndContext,
   DragOverlay,
-  closestCorners,
   PointerSensor,
+  TouchSensor,
+  KeyboardSensor,
   useSensor,
   useSensors,
-  useDroppable,
   pointerWithin,
-  rectIntersection,
 } from '@dnd-kit/core';
 import {
   SortableContext,
@@ -59,9 +58,16 @@ const KanbanBoard = ({ user }) => {
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
-        distance: 8, // 8px de movimiento antes de activar drag
+        distance: 6,
       },
-    })
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: {
+        delay: 120,
+        tolerance: 12,
+      },
+    }),
+    useSensor(KeyboardSensor)
   );
 
   useEffect(() => {
@@ -364,53 +370,55 @@ const KanbanBoard = ({ user }) => {
       >
         {/* Scroll horizontal en móvil */}
         <div className="lg:grid lg:grid-cols-3 lg:gap-6">
-          <div className="flex lg:contents gap-4 overflow-x-auto pb-4 lg:pb-0 snap-x snap-mandatory">
+          <div className="flex lg:contents gap-3 sm:gap-4 overflow-x-auto pb-4 lg:pb-0 snap-x snap-mandatory touch-pan-x">
             {columns.map((column) => {
               const columnTasks = getTasksByStatus(column.id);
               return (
                 <div
                   key={column.id}
                   data-testid={`kanban-column-${column.id}`}
-                  className="glass rounded-xl p-4 shadow-lg min-w-[280px] flex-shrink-0 snap-start lg:min-w-0"
+                  className="glass rounded-xl p-4 sm:p-5 shadow-lg min-w-[260px] sm:min-w-[280px] flex-shrink-0 snap-start lg:min-w-0"
                 >
-                  <div className={`bg-gradient-to-r ${column.color} text-white p-4 md:p-5 rounded-xl mb-4 shadow-lg`}>
+                  <div className={`bg-gradient-to-r ${column.color} text-white p-3 sm:p-4 md:p-5 rounded-xl mb-4 shadow-lg`}>
                     <div className="flex items-center justify-between">
                       <div>
                         <div className="flex items-center gap-2 mb-1">
-                          <span className="text-xl md:text-2xl">{column.icon}</span>
-                          <h3 className="text-lg md:text-xl font-bold">{column.title}</h3>
+                          <span className="text-lg sm:text-xl md:text-2xl">{column.icon}</span>
+                          <h3 className="text-base sm:text-lg md:text-xl font-bold">{column.title}</h3>
                         </div>
-                      <p className="text-sm opacity-90">{columnTasks.length} {columnTasks.length === 1 ? 'tarea' : 'tareas'}</p>
+                        <p className="text-xs sm:text-sm opacity-90">
+                          {columnTasks.length} {columnTasks.length === 1 ? 'tarea' : 'tareas'}
+                        </p>
+                      </div>
                     </div>
                   </div>
-                </div>
-                
-                <DroppableColumn 
-                  id={`column-${column.id}`} 
-                  className="space-y-3 min-h-[400px]"
-                >
-                  <SortableContext
-                    items={columnTasks.map((t) => t.id)}
-                    strategy={verticalListSortingStrategy}
+
+                  <DroppableColumn
+                    id={`column-${column.id}`}
+                    className="space-y-3 min-h-[360px] sm:min-h-[420px]"
                   >
-                    {columnTasks.map((task) => {
-                      const taskType = getTaskType(task.task_type_id);
-                      return (
-                        <SortableTask
-                          key={task.id}
-                          task={task}
-                          taskType={taskType}
-                          priorityConfig={priorityConfig}
-                          onEdit={openEditDialog}
-                          onDelete={handleDelete}
-                        />
-                      );
-                    })}
-                  </SortableContext>
-                </DroppableColumn>
-              </div>
-            );
-          })}
+                    <SortableContext
+                      items={columnTasks.map((t) => t.id)}
+                      strategy={verticalListSortingStrategy}
+                    >
+                      {columnTasks.map((task) => {
+                        const taskType = getTaskType(task.task_type_id);
+                        return (
+                          <SortableTask
+                            key={task.id}
+                            task={task}
+                            taskType={taskType}
+                            priorityConfig={priorityConfig}
+                            onEdit={openEditDialog}
+                            onDelete={handleDelete}
+                          />
+                        );
+                      })}
+                    </SortableContext>
+                  </DroppableColumn>
+                </div>
+              );
+            })}
           </div>
         </div>
 

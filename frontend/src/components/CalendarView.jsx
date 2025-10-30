@@ -5,7 +5,7 @@ import { Card } from '@/components/ui/card';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { toast } from 'sonner';
 import { Plus, Trash2, Edit, ChevronLeft, ChevronRight, Link2 } from 'lucide-react';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMonths, addWeeks, subWeeks, startOfWeek, endOfWeek, isWithinInterval, parseISO, differenceInDays, isSameDay, isAfter, isBefore, isSameMonth } from 'date-fns';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMonths, addWeeks, subWeeks, startOfWeek, endOfWeek, isWithinInterval, parseISO, differenceInDays, isSameDay, isAfter, isBefore, isSameMonth, startOfDay } from 'date-fns';
 import { es } from 'date-fns/locale';
 import EventDialog from './EventDialog';
 import EventPopover from './EventPopover';
@@ -19,12 +19,32 @@ const CalendarView = ({ user }) => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState(null);
   const [hoveredEventId, setHoveredEventId] = useState(null);
+  const [viewportWidth, setViewportWidth] = useState(
+    typeof window !== 'undefined' ? window.innerWidth : 1024
+  );
 
   useEffect(() => {
     loadEvents();
     loadEventTypes();
     loadOrders();
   }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handleResize = () => setViewportWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const today = new Date();
+  const isMobile = viewportWidth < 640;
+  const isTablet = viewportWidth >= 640 && viewportWidth < 1024;
+  const dayCellMinHeight = isMobile ? 80 : isTablet ? 120 : 140;
+  const eventBarHeight = isMobile ? 18 : 22;
+  const eventBarOffset = isMobile ? 16 : 24;
+  const weeklyColumnMinHeight = isMobile ? 260 : isTablet ? 340 : 400;
+  const weeklyEventHeight = isMobile ? 52 : 58;
+  const weeklyTrackOffset = isMobile ? 52 : 58;
 
   const loadEvents = async () => {
     try {
@@ -185,7 +205,7 @@ const CalendarView = ({ user }) => {
           <h2 className="text-3xl lg:text-4xl font-bold text-gray-900">Calendario</h2>
           <p className="text-gray-600 mt-1">Gestiona pedidos, albaranes y documentación</p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex flex-wrap gap-2 sm:gap-3">
           <Button
             onClick={() => setViewMode(viewMode === 'month' ? 'week' : 'month')}
             data-testid="calendar-view-toggle"
@@ -209,7 +229,7 @@ const CalendarView = ({ user }) => {
       </div>
 
       {/* Calendar Navigation */}
-      <div className="flex items-center justify-between mb-6 flex-wrap gap-2">
+      <div className="flex items-center justify-between mb-6 flex-wrap gap-2 sm:gap-3">
         <Button
           variant="outline"
           onClick={handlePrevious}
@@ -219,7 +239,7 @@ const CalendarView = ({ user }) => {
         >
           <ChevronLeft className="h-5 w-5" />
         </Button>
-        <h3 className="text-lg md:text-xl font-semibold" data-testid="calendar-month-display">
+        <h3 className="text-base sm:text-lg md:text-xl font-semibold" data-testid="calendar-month-display">
           {getWeekTitle()}
         </h3>
         <Button
@@ -236,11 +256,11 @@ const CalendarView = ({ user }) => {
       {/* Calendar Grid */}
       {viewMode === 'month' ? (
         // Vista Mensual con eventos extendidos
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto sm:overflow-visible">
           {/* Headers */}
-          <div className="grid grid-cols-7 gap-2 md:gap-3 mb-3 min-w-[640px]">
+          <div className="grid grid-cols-7 gap-1 sm:gap-2 lg:gap-3 mb-3 min-w-full sm:min-w-[640px]">
             {['L', 'M', 'X', 'J', 'V', 'S', 'D'].map((day, i) => (
-              <div key={day} className="text-center font-bold text-gray-700 text-sm md:text-base">
+              <div key={day} className="text-center font-bold text-gray-700 text-[11px] sm:text-sm md:text-base">
                 <span className="hidden sm:inline">
                   {['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'][i]}
                 </span>
@@ -250,18 +270,29 @@ const CalendarView = ({ user }) => {
           </div>
 
           {/* Days Grid */}
-          <div className="grid grid-cols-7 gap-2 md:gap-3 relative min-w-[640px]">
+          <div className="grid grid-cols-7 gap-1 sm:gap-2 lg:gap-3 relative min-w-full sm:min-w-[640px]">
             {/* Capa de fondo: Celdas de días */}
             <div className="contents">
               {days.map((day) => {
                 const isCurrentMonth = isSameMonth(day, selectedDate);
+                const isToday = isSameDay(day, today);
+                const isPast = isBefore(day, startOfDay(today)) && isCurrentMonth;
                 return (
                   <div
                     key={day.toString()}
-                    className={`p-2 md:p-3 glass rounded-lg min-h-[100px] md:min-h-[140px] ${!isCurrentMonth ? 'opacity-40' : ''}`}
+                    className={`p-2 sm:p-3 rounded-lg border transition-colors ${
+                      isToday
+                        ? 'bg-blue-50 border-blue-200 text-blue-900'
+                        : isPast
+                        ? 'bg-slate-100 border-slate-200 text-slate-500'
+                        : 'glass border-white/40'
+                    } ${!isCurrentMonth ? 'opacity-40' : ''}`}
                     data-testid={`calendar-day-${format(day, 'yyyy-MM-dd')}`}
+                    style={{ minHeight: dayCellMinHeight }}
                   >
-                    <div className={`font-semibold text-xs md:text-sm ${isCurrentMonth ? 'text-gray-900' : 'text-gray-500'}`}>
+                    <div className={`font-semibold text-[11px] sm:text-xs md:text-sm ${
+                      isToday ? 'text-blue-900' : isPast ? 'text-slate-500' : isCurrentMonth ? 'text-gray-900' : 'text-gray-500'
+                    }`}>
                       {format(day, 'd MMM', { locale: es })}
                     </div>
                   </div>
@@ -275,7 +306,7 @@ const CalendarView = ({ user }) => {
               style={{ 
                 display: 'grid',
                 gridTemplateColumns: 'repeat(7, 1fr)',
-                gridTemplateRows: `repeat(${Math.ceil(days.length / 7)}, minmax(140px, 1fr))`,
+                gridTemplateRows: `repeat(${Math.ceil(days.length / 7)}, minmax(${dayCellMinHeight}px, 1fr))`,
                 pointerEvents: 'none' 
               }}
             >
@@ -338,8 +369,6 @@ const CalendarView = ({ user }) => {
                   }
                 });
                 
-                console.log('=== Vista Mensual - Global Tracks (No Compression) ===');
-                
                 return events.map((event, globalIdx) => {
                   const eventSpan = getEventSpan(event, days);
                   if (!eventSpan) return null;
@@ -360,8 +389,8 @@ const CalendarView = ({ user }) => {
                             backgroundColor: eventType?.color || '#6366f1',
                             gridColumn: `${dayOfWeek + 1} / span ${Math.min(eventSpan.span, 7 - dayOfWeek)}`,
                             gridRow: weekRow + 1,
-                            marginTop: `${24 + track * 22}px`,
-                            height: '22px',
+                            marginTop: `${eventBarOffset + track * (eventBarHeight + 6)}px`,
+                            height: `${eventBarHeight}px`,
                             pointerEvents: 'auto',
                             zIndex: 10 + globalIdx
                           }}
@@ -417,139 +446,128 @@ const CalendarView = ({ user }) => {
         </div>
       ) : (
         // Vista Semanal con eventos extendidos
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto sm:overflow-visible">
           {/* Headers */}
-          <div className="grid grid-cols-7 gap-2 md:gap-3 mb-3 min-w-[640px]">
-            {days.map((day) => (
-              <div key={day.toString()} className="text-center bg-gradient-to-r from-teal-500 to-cyan-500 text-white p-2 md:p-3 rounded-lg shadow-md">
-                <div className="font-bold text-base md:text-lg">{format(day, 'd', { locale: es })}</div>
-                <div className="text-xs md:text-sm opacity-90">{format(day, 'EEE', { locale: es })}</div>
-              </div>
-            ))}
-          </div>
-          
-          {/* Week body con eventos extendidos */}
-          <div className="relative min-w-[640px]" style={{ minHeight: '400px' }}>
-            {/* Columnas de fondo */}
-            <div className="grid grid-cols-7 gap-2 md:gap-3">
-              {days.map((day) => (
+          <div className="grid grid-cols-7 gap-1 sm:gap-2 lg:gap-3 mb-3 min-w-full sm:min-w-[640px]">
+            {days.map((day) => {
+              const isToday = isSameDay(day, today);
+              const isPast = isBefore(day, startOfDay(today));
+              const isCurrentMonth = isSameMonth(day, selectedDate);
+              return (
                 <div
                   key={day.toString()}
-                  className="glass rounded-lg min-h-[400px]"
-                  data-testid={`calendar-day-${format(day, 'yyyy-MM-dd')}`}
-                />
-              ))}
+                  className={`text-center p-2 md:p-3 rounded-lg border transition-colors shadow-md ${
+                    isToday
+                      ? 'bg-blue-500 text-white border-blue-600'
+                      : isPast
+                      ? 'bg-slate-200 text-slate-600 border-slate-300'
+                      : 'bg-gradient-to-r from-teal-500 to-cyan-500 text-white border-transparent'
+                  } ${!isCurrentMonth ? 'opacity-80' : ''}`}
+                >
+                  <div className="font-bold text-base md:text-lg">{format(day, 'd', { locale: es })}</div>
+                  <div className={`text-xs md:text-sm ${isToday ? 'opacity-100' : 'opacity-90'}`}>
+                    {format(day, 'EEE', { locale: es })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Week body con eventos extendidos */}
+          <div className="relative min-w-full sm:min-w-[640px]" style={{ minHeight: `${weeklyColumnMinHeight}px` }}>
+            {/* Columnas de fondo */}
+            <div className="grid grid-cols-7 gap-1 sm:gap-2 lg:gap-3">
+              {days.map((day) => {
+                const isCurrentMonth = isSameMonth(day, selectedDate);
+                const isToday = isSameDay(day, today);
+                const isPast = isBefore(day, startOfDay(today)) && (isCurrentMonth || viewMode === 'week');
+                return (
+                  <div
+                    key={day.toString()}
+                    className={`rounded-lg border transition-colors ${
+                      isToday
+                        ? 'bg-blue-50 border-blue-200'
+                        : isPast
+                        ? 'bg-slate-100 border-slate-200'
+                        : 'glass border-white/40'
+                    } ${!isCurrentMonth ? 'opacity-80' : ''}`}
+                    data-testid={`calendar-day-${format(day, 'yyyy-MM-dd')}`}
+                    style={{ minHeight: `${weeklyColumnMinHeight}px` }}
+                  />
+                );
+              })}
             </div>
             
             {/* Eventos superpuestos que se extienden */}
-            <div className="absolute top-0 left-0 right-0 grid grid-cols-7 gap-2 md:gap-3" style={{ pointerEvents: 'none' }}>
+            <div
+              className="absolute top-0 left-0 right-0 grid grid-cols-7 gap-1 sm:gap-2 lg:gap-3"
+              style={{
+                pointerEvents: 'none',
+                gridAutoRows: `${weeklyEventHeight}px`
+              }}
+            >
               {(() => {
-                // Algoritmo de interval scheduling para asignar tracks sin solapamientos
-                const tracks = Array(7).fill(null).map(() => []); // tracks[day] = [eventos en cada track]
-                const eventTracks = {}; // { eventId: trackNumber }
-                
-                // Preparar eventos con sus spans
-                const eventSpans = events.map(event => ({
-                  event,
-                  span: getEventSpan(event, days)
-                })).filter(item => item.span !== null);
-                
-                // Ordenar por: 1) día de inicio, 2) duración (más largos primero), 3) día de fin, 4) ID (estabilidad)
+                // Preparar eventos con sus spans dentro de la semana
+                const eventSpans = events
+                  .map((event) => ({ event, span: getEventSpan(event, days) }))
+                  .filter((item) => item.span !== null);
+
+                // Ordenar para asignar tracks de forma determinista y compacta
                 eventSpans.sort((a, b) => {
                   if (a.span.startIndex !== b.span.startIndex) {
                     return a.span.startIndex - b.span.startIndex;
                   }
                   if (a.span.span !== b.span.span) {
-                    return b.span.span - a.span.span; // Más largos primero
+                    return b.span.span - a.span.span;
                   }
                   const endDiffA = a.span.startIndex + a.span.span;
                   const endDiffB = b.span.startIndex + b.span.span;
                   if (endDiffA !== endDiffB) {
                     return endDiffA - endDiffB;
                   }
-                  // Criterio estable: ordenar por ID para que el orden sea determinístico
                   return a.event.id.localeCompare(b.event.id);
                 });
-                
-                // Asignar tracks a cada evento
+
+                // Asignar tracks locales día a día evitando huecos
+                const dayAssignments = Array.from({ length: 7 }, () => new Set());
+                const localTrackByEvent = {};
+
                 eventSpans.forEach(({ event, span }) => {
                   const startDay = span.startIndex;
                   const endDay = Math.min(span.startIndex + span.span - 1, 6);
-                  
-                  // Buscar el primer track disponible en TODOS los días que ocupa el evento
+
                   let trackNum = 0;
-                  let foundTrack = false;
-                  
-                  while (!foundTrack) {
-                    let canUseTrack = true;
-                    
-                    // Verificar si este track está libre en todos los días del evento
+                  let assigned = false;
+
+                  while (!assigned) {
+                    let available = true;
+
                     for (let day = startDay; day <= endDay; day++) {
-                      if (tracks[day][trackNum]) {
-                        canUseTrack = false;
+                      if (dayAssignments[day].has(trackNum)) {
+                        available = false;
                         break;
                       }
                     }
-                    
-                    if (canUseTrack) {
-                      // Ocupar este track en todos los días
+
+                    if (available) {
+                      localTrackByEvent[event.id] = trackNum;
                       for (let day = startDay; day <= endDay; day++) {
-                        tracks[day][trackNum] = event.id;
+                        dayAssignments[day].add(trackNum);
                       }
-                      eventTracks[event.id] = trackNum;
-                      foundTrack = true;
+                      assigned = true;
                     } else {
                       trackNum++;
                     }
                   }
                 });
-                
-                // Comprimir tracks por columna para eliminar espacios
-                // Para cada día, crear mapeo de track global → track local (comprimido)
-                const trackMappingPerDay = {};
-                
-                for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
-                  // Obtener todos los tracks que están VISIBLES/PRESENTES en este día
-                  const tracksInThisDay = [];
-                  
-                  // Para cada evento, verificar si está presente en este día
-                  eventSpans.forEach(({ event, span }) => {
-                    const startDay = span.startIndex;
-                    const endDay = Math.min(span.startIndex + span.span - 1, 6);
-                    
-                    // Si el evento está visible en este día (lo atraviesa)
-                    if (dayIndex >= startDay && dayIndex <= endDay) {
-                      const globalTrack = eventTracks[event.id];
-                      if (globalTrack !== undefined && !tracksInThisDay.includes(globalTrack)) {
-                        tracksInThisDay.push(globalTrack);
-                      }
-                    }
-                  });
-                  
-                  // Ordenar tracks y crear mapeo comprimido
-                  tracksInThisDay.sort((a, b) => a - b);
-                  trackMappingPerDay[dayIndex] = {};
-                  tracksInThisDay.forEach((globalTrack, localIndex) => {
-                    trackMappingPerDay[dayIndex][globalTrack] = localIndex;
-                  });
-                }
-                
-                // Debug log
-                console.log('=== Vista Semanal - Compressed Tracks ===');
-                console.log('Track Mapping Per Day:', trackMappingPerDay);
-                
-                // Renderizar eventos
-                return events.map((event, globalIndex) => {
-                  const eventSpan = getEventSpan(event, days);
-                  if (!eventSpan) return null;
-                  
-                  const globalTrack = eventTracks[event.id] || 0;
-                  const startDay = eventSpan.startIndex;
-                  const localTrack = trackMappingPerDay[startDay]?.[globalTrack] ?? globalTrack;
-                  
+
+                return eventSpans.map(({ event, span }, index) => {
+                  const localTrack = localTrackByEvent[event.id] ?? 0;
+                  const startIndex = span.startIndex;
+                  const spanLength = span.span;
                   const eventType = getEventType(event.event_type_id);
                   const duration = differenceInDays(parseISO(event.fecha_fin), parseISO(event.fecha_inicio));
-                  
+
                   return (
                     <Popover key={event.id} open={hoveredEventId === event.id} onOpenChange={(open) => !open && setHoveredEventId(null)}>
                       <PopoverTrigger asChild>
@@ -558,11 +576,11 @@ const CalendarView = ({ user }) => {
                           style={{
                             backgroundColor: `${eventType?.color}15`,
                             borderColor: eventType?.color || '#6366f1',
-                            gridColumn: `${eventSpan.startIndex + 1} / span ${eventSpan.span}`,
-                            marginTop: `${localTrack * 58}px`,
-                            height: '58px',
+                            gridColumn: `${startIndex + 1} / span ${spanLength}`,
+                            gridRowStart: localTrack + 1,
+                            height: `${weeklyEventHeight}px`,
                             pointerEvents: 'auto',
-                            zIndex: 10 + globalIndex
+                            zIndex: 10 + index
                           }}
                         onMouseEnter={() => setHoveredEventId(event.id)}
                         onMouseLeave={() => setHoveredEventId(null)}

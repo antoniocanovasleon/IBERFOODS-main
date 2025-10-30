@@ -26,10 +26,15 @@ const Dashboard = ({ user, onLogout }) => {
   }
 
   return (
-    <div className="min-h-screen flex">
+    <div className="min-h-screen flex bg-slate-50 dark:bg-slate-900">
       {/* Sidebar */}
-      <aside className={`fixed lg:static inset-y-0 left-0 z-50 w-64 glass border-r border-white/30 transform transition-transform duration-300 lg:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-        <div className="h-full flex flex-col p-6">
+      <aside
+        className={`fixed lg:static inset-y-0 left-0 z-50 w-[260px] sm:w-72 glass border-r border-white/30 transform transition-transform duration-300 lg:translate-x-0 ${
+          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}
+        aria-hidden={!sidebarOpen && window.innerWidth < 1024}
+      >
+        <div className="h-full flex flex-col p-5 sm:p-6 gap-4">
           <div className="flex items-center justify-between mb-8">
             <h1 className="text-2xl font-bold bg-gradient-to-r from-teal-600 to-cyan-600 bg-clip-text text-transparent">
               Panel Control
@@ -43,7 +48,7 @@ const Dashboard = ({ user, onLogout }) => {
             </button>
           </div>
 
-          <div className="flex-1 space-y-2">
+          <nav className="flex-1 space-y-1.5 overflow-y-auto pr-1">
             {menuItems.map((item) => {
               const Icon = item.icon;
               const isActive = location.pathname === item.path;
@@ -55,21 +60,24 @@ const Dashboard = ({ user, onLogout }) => {
                     navigate(item.path);
                     setSidebarOpen(false);
                   }}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all duration-300 ${
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 ${
                     isActive
                       ? 'bg-gradient-to-r from-teal-500 to-cyan-500 text-white shadow-lg'
                       : 'text-gray-700 hover:bg-white/50'
                   }`}
+                  aria-current={isActive ? 'page' : undefined}
                 >
                   <Icon className="h-5 w-5" />
                   <span>{item.label}</span>
                 </button>
               );
             })}
-          </div>
+          </nav>
 
           {/* Orders Sidebar - Pedidos Activos */}
-          <OrdersSidebar />
+          <div className="hidden lg:block">
+            <OrdersSidebar />
+          </div>
 
           <div className="border-t border-gray-200 pt-4 mt-4">
             <div className="mb-4 p-3 bg-white/50 rounded-lg">
@@ -81,7 +89,7 @@ const Dashboard = ({ user, onLogout }) => {
               onClick={onLogout}
               data-testid="logout-button"
               variant="outline"
-              className="w-full justify-start gap-3 hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-colors"
+              className="w-full justify-start gap-3 hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-colors focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
             >
               <LogOut className="h-5 w-5" />
               <span>Cerrar Sesión</span>
@@ -93,22 +101,25 @@ const Dashboard = ({ user, onLogout }) => {
       {/* Main Content */}
       <div className="flex-1 flex flex-col min-h-screen">
         {/* Mobile Header */}
-        <header className="lg:hidden glass border-b border-white/30 p-4 flex items-center justify-between">
+        <header className="lg:hidden glass border-b border-white/30 px-4 py-3 flex items-center justify-between sticky top-0 z-40 backdrop-blur">
           <button
             onClick={() => setSidebarOpen(true)}
             data-testid="open-sidebar-button"
             className="text-gray-600 hover:text-gray-900"
+            aria-label="Abrir menú"
           >
             <Menu className="h-6 w-6" />
           </button>
-          <h1 className="text-xl font-bold bg-gradient-to-r from-teal-600 to-cyan-600 bg-clip-text text-transparent">
+          <h1 className="text-lg font-bold bg-gradient-to-r from-teal-600 to-cyan-600 bg-clip-text text-transparent">
             Panel Control
           </h1>
-          <div className="w-6"></div>
+          <span className="text-sm text-gray-500" aria-hidden="true">
+            {user.name?.split(' ')[0] || 'Usuario'}
+          </span>
         </header>
 
         {/* Content */}
-        <main className="flex-1 p-4 lg:p-8">
+        <main className="flex-1 px-4 sm:px-6 md:px-8 py-4"> 
           <Routes>
             <Route path="/" element={<CalendarView user={user} />} />
             <Route path="/kanban" element={<KanbanBoard user={user} />} />
@@ -127,6 +138,14 @@ const Dashboard = ({ user, onLogout }) => {
         <div
           className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40 lg:hidden"
           onClick={() => setSidebarOpen(false)}
+          role="button"
+          tabIndex={0}
+          aria-label="Cerrar menú"
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              setSidebarOpen(false);
+            }
+          }}
         ></div>
       )}
     </div>

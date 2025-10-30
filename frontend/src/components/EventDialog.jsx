@@ -106,14 +106,49 @@ const EventDialog = ({ open, onClose, onSave, onDelete, editingEvent, eventTypes
     return ['Pedido', 'Factura Proforma'].includes(typeName);
   };
 
+  const buildPayload = () => {
+    const payload = {
+      ...formData,
+      custom_fields: formData.custom_fields || {},
+    };
+
+    // Normalizar campos opcionales ('' -> null)
+    ['order_number', 'client', 'supplier', 'linked_order_id', 'description'].forEach((field) => {
+      if (payload[field] === '') {
+        payload[field] = null;
+      }
+    });
+
+    // Convertir amount a número o null
+    if (payload.amount === '' || payload.amount === null || payload.amount === undefined) {
+      payload.amount = null;
+    } else {
+      const parsedAmount = parseFloat(payload.amount);
+      payload.amount = Number.isFinite(parsedAmount) ? parsedAmount : null;
+    }
+
+    // Si la categoría es "event", limpiar campos específicos de pedidos
+    if (selectedCategory !== 'document') {
+      payload.order_number = null;
+      payload.client = null;
+      payload.supplier = null;
+      payload.amount = null;
+      payload.linked_order_id = payload.linked_order_id || null;
+    }
+
+    return payload;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
+      const payload = buildPayload();
+
       if (editingEvent) {
-        await axiosInstance.put(`/calendar/${editingEvent.id}`, formData);
+        await axiosInstance.put(`/calendar/${editingEvent.id}`, payload);
         toast.success('Evento actualizado');
       } else {
-        await axiosInstance.post('/calendar', formData);
+        await axiosInstance.post('/calendar', payload);
         toast.success('Evento creado');
       }
       onSave();
