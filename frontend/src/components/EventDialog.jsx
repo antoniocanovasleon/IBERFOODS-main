@@ -26,6 +26,7 @@ const EventDialog = ({ open, onClose, onSave, onDelete, editingEvent, eventTypes
     supplier: '',
     amount: '',
     linked_order_id: '',
+    order_date: '',
   });
   const [orders, setOrders] = useState([]);
   const [customFieldKey, setCustomFieldKey] = useState('');
@@ -57,6 +58,7 @@ const EventDialog = ({ open, onClose, onSave, onDelete, editingEvent, eventTypes
         supplier: editingEvent.supplier || '',
         amount: editingEvent.amount || '',
         linked_order_id: editingEvent.linked_order_id || '',
+        order_date: editingEvent.custom_fields?.order_date || '',
       });
     } else {
       resetForm();
@@ -89,6 +91,7 @@ const EventDialog = ({ open, onClose, onSave, onDelete, editingEvent, eventTypes
       supplier: '',
       amount: '',
       linked_order_id: '',
+      order_date: '',
     });
     setCustomFieldKey('');
     setCustomFieldValue('');
@@ -124,6 +127,9 @@ const EventDialog = ({ open, onClose, onSave, onDelete, editingEvent, eventTypes
       }
     });
 
+    const orderDate = payload.order_date;
+    delete payload.order_date;
+
     // Convertir amount a número o null
     if (payload.amount === '' || payload.amount === null || payload.amount === undefined) {
       payload.amount = null;
@@ -154,6 +160,19 @@ const EventDialog = ({ open, onClose, onSave, onDelete, editingEvent, eventTypes
       payload.supplier = null;
       payload.amount = null;
       payload.linked_order_id = payload.linked_order_id || null;
+      if (payload.custom_fields && 'order_date' in payload.custom_fields) {
+        const { order_date, ...restFields } = payload.custom_fields;
+        payload.custom_fields = Object.keys(restFields).length ? restFields : {};
+      }
+    }
+
+    if (selectedCategory === 'document') {
+      if (orderDate) {
+        payload.custom_fields.order_date = orderDate;
+      } else if (payload.custom_fields && 'order_date' in payload.custom_fields) {
+        const { order_date, ...restFields } = payload.custom_fields;
+        payload.custom_fields = Object.keys(restFields).length ? restFields : {};
+      }
     }
 
     return payload;
@@ -355,6 +374,17 @@ const EventDialog = ({ open, onClose, onSave, onDelete, editingEvent, eventTypes
                     value={formData.order_number}
                     onChange={(e) => setFormData({ ...formData, order_number: e.target.value })}
                     placeholder="Ej: PED-001"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="order_date">Fecha del pedido</Label>
+                  <Input
+                    id="order_date"
+                    data-testid="order-date-input"
+                    type="date"
+                    value={formData.order_date}
+                    onChange={(e) => setFormData({ ...formData, order_date: e.target.value })}
                     required
                   />
                 </div>

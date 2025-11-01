@@ -8,7 +8,8 @@ const EventPopover = ({ event, eventType }) => {
   const isDocument = eventType?.category === 'document';
   
   // Verificar si tiene información de documento
-  const hasDocumentInfo = event.order_number || event.client || event.supplier || event.amount;
+  const orderDate = event.custom_fields?.order_date;
+  const hasDocumentInfo = event.order_number || event.client || event.supplier || event.amount || orderDate;
   
   return (
     <Card className="w-80 shadow-2xl border-2" style={{ borderColor: eventType?.color }}>
@@ -50,6 +51,12 @@ const EventPopover = ({ event, eventType }) => {
                   <span className="text-gray-900 font-semibold">{event.order_number}</span>
                 </div>
               )}
+              {orderDate && (
+                <div className="flex justify-between text-xs">
+                  <span className="font-medium text-gray-700">Fecha:</span>
+                  <span className="text-gray-900">{format(parseISO(orderDate), 'd MMM yyyy', { locale: es })}</span>
+                </div>
+              )}
               {event.client && (
                 <div className="flex justify-between text-xs">
                   <span className="font-medium text-gray-700">Cliente:</span>
@@ -79,12 +86,14 @@ const EventPopover = ({ event, eventType }) => {
               Información adicional:
             </p>
             <div className="space-y-1 bg-gray-50 p-2 rounded">
-              {Object.entries(event.custom_fields).map(([key, value]) => (
-                <div key={key} className="text-xs">
-                  <span className="font-medium text-gray-700">{key}:</span>{' '}
-                  <span className="text-gray-600">{value}</span>
-                </div>
-              ))}
+              {Object.entries(event.custom_fields)
+                .filter(([key]) => !['is_pending', 'order_date'].includes(key))
+                .map(([key, value]) => (
+                  <div key={key} className="text-xs">
+                    <span className="font-medium text-gray-700">{key}:</span>{' '}
+                    <span className="text-gray-600">{String(value)}</span>
+                  </div>
+                ))}
             </div>
           </div>
         )}
