@@ -604,7 +604,9 @@ const CalendarView = ({ user }) => {
                   if (endDiffA !== endDiffB) {
                     return endDiffA - endDiffB;
                   }
-                  return a.event.id.localeCompare(b.event.id);
+                  const idA = getEntryId(a.entry);
+                  const idB = getEntryId(b.entry);
+                  return idA.localeCompare(idB);
                 });
 
                 // Asignar tracks locales día a día evitando huecos
