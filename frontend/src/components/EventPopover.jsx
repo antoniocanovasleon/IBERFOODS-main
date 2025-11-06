@@ -3,37 +3,52 @@ import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Calendar, FileText } from 'lucide-react';
 
-const EventPopover = ({ event, eventType }) => {
+const EventPopover = ({ event, eventType, reminder = null }) => {
   // Verificar si es un documento
-  const isDocument = eventType?.category === 'document';
+  const isReminder = Boolean(reminder);
+  const isDocument = !isReminder && eventType?.category === 'document';
   
   // Verificar si tiene información de documento
   const orderDate = event.custom_fields?.order_date;
-  const hasDocumentInfo = event.order_number || event.client || event.supplier || event.amount || orderDate;
+  const hasDocumentInfo = !isReminder && (event.order_number || event.client || event.supplier || event.amount || orderDate);
   
+  const getBadgeLabel = () => {
+    if (isReminder) {
+      const parentName = reminder.parent_event_type_name || eventType?.name || 'Evento';
+      return `🔔 Recordatorio ${parentName}`;
+    }
+    if (isDocument) {
+      return `📄 ${eventType?.name}`;
+    }
+    return `📅 ${eventType?.name}`;
+  };
+
   return (
     <Card className="w-80 shadow-2xl border-2" style={{ borderColor: eventType?.color }}>
       <CardHeader className="pb-3" style={{ backgroundColor: `${eventType?.color}15` }}>
-        <CardTitle className="text-base font-bold text-gray-900">{event.title}</CardTitle>
+        <CardTitle className="text-base font-bold text-gray-900">
+          {isReminder ? reminder.title : event.title}
+        </CardTitle>
         <div className="flex items-center gap-2 mt-2">
           <span
             className="text-xs px-2 py-1 rounded-full text-white font-medium"
             style={{ backgroundColor: eventType?.color }}
           >
-            {isDocument ? '📄' : '📅'} {eventType?.name}
+            {getBadgeLabel()}
           </span>
           <div className="flex items-center gap-1 text-xs text-gray-600">
             <Calendar className="h-3 w-3" />
             <span>
-              {format(parseISO(event.fecha_inicio), 'd MMM', { locale: es })} - {format(parseISO(event.fecha_fin), 'd MMM', { locale: es })}
+              {format(parseISO(reminder?.reminder_date ?? event.fecha_inicio), 'd MMM', { locale: es })}
+              {!isReminder && ` - ${format(parseISO(event.fecha_fin), 'd MMM', { locale: es })}`}
             </span>
           </div>
         </div>
       </CardHeader>
       <CardContent className="pt-3 space-y-3">
-        {event.description && (
+        {(isReminder ? reminder.description : event.description) && (
           <div>
-            <p className="text-sm text-gray-700">{event.description}</p>
+            <p className="text-sm text-gray-700">{isReminder ? reminder.description : event.description}</p>
           </div>
         )}
         

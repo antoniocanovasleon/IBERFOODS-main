@@ -85,6 +85,17 @@ class TaskType(BaseModel):
     created_by: str
     created_at: Optional[str] = None
 
+class EventReminderCreate(BaseModel):
+    title: str
+    description: Optional[str] = None
+    reminder_date: str
+
+class EventReminder(EventReminderCreate):
+    model_config = ConfigDict(extra="ignore")
+    id: str
+    event_id: str
+    created_at: Optional[str] = None
+
 class CalendarEventCreate(BaseModel):
     title: str
     description: Optional[str] = None
@@ -98,6 +109,7 @@ class CalendarEventCreate(BaseModel):
     supplier: Optional[str] = None
     amount: Optional[float] = None
     linked_order_id: Optional[str] = None
+    reminders: Optional[List[EventReminderCreate]] = None
 
 class CalendarEvent(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -116,6 +128,7 @@ class CalendarEvent(BaseModel):
     supplier: Optional[str] = None
     amount: Optional[float] = None
     linked_order_id: Optional[str] = None
+    reminders: Optional[List[EventReminder]] = None
 
 class OrderCreate(BaseModel):
     calendar_event_id: str
@@ -422,9 +435,35 @@ async def create_event(event_data: CalendarEventCreate, current_user: User = Dep
         if data.get(field) == '':
             data[field] = None
     
+    reminders_payload = data.pop('reminders', None)
+
     # Crear evento en calendar_events
     result = supabase.table('calendar_events').insert(data).execute()
     created_event = result.data[0]
+
+    reminders_result: List[Dict[str, Any]] = []
+    def normalize_reminder_date(value: str) -> str:
+        try:
+            if "T" in value:
+                parsed = datetime.fromisoformat(value)
+            else:
+                parsed = datetime.fromisoformat(f"{value}T00:00:00")
+            return parsed.isoformat()
+        except Exception:
+            return value
+
+    if reminders_payload:
+        reminder_rows = []
+        for reminder in reminders_payload:
+            reminder_rows.append({
+                'event_id': created_event['id'],
+                'title': reminder['title'],
+                'description': reminder.get('description'),
+                'reminder_date': normalize_reminder_date(reminder['reminder_date'])
+            })
+        insert_result = supabase.table('event_reminders').insert(reminder_rows).execute()
+        if insert_result.data:
+            reminders_result = insert_result.data
 
     # Si el evento es tipo "Pedido" o "Factura Proforma", crear entrada en orders
     event_type_result = supabase.table('event_types').select('name').eq('id', data['event_type_id']).execute()
@@ -457,12 +496,29 @@ async def create_event(event_data: CalendarEventCreate, current_user: User = Dep
             if event_type_name == 'Factura Comisiones IBERFOODS':
                 supabase.table('orders').update({'status': 'completed'}).eq('id', data['linked_order_id']).execute()
     
+    created_event['reminders'] = reminders_result
     return CalendarEvent(**created_event)
 
 @api_router.get("/calendar", response_model=List[CalendarEvent])
 async def get_events(current_user: User = Depends(get_current_user)):
     result = supabase.table('calendar_events').select('*').execute()
-    return result.data
+    events = result.data or []
+
+    if not events:
+        return events
+
+    event_ids = [event['id'] for event in events]
+    reminders_query = supabase.table('event_reminders').select('*').in_('event_id', event_ids).execute()
+    reminders = reminders_query.data or []
+
+    reminders_by_event: Dict[str, List[Dict[str, Any]]] = {}
+    for reminder in reminders:
+        reminders_by_event.setdefault(reminder['event_id'], []).append(reminder)
+
+    for event in events:
+        event['reminders'] = reminders_by_event.get(event['id'], [])
+
+    return events
 
 @api_router.put("/calendar/{event_id}", response_model=CalendarEvent)
 async def update_event(
@@ -487,9 +543,30 @@ async def update_event(
     
     current_event = current_event_result.data[0]
     
+    reminders_payload = update_data.pop('reminders', None)
+
     # Actualizar el evento
     result = supabase.table('calendar_events').update(update_data).eq('id', event_id).execute()
     updated_event = result.data[0]
+
+    updated_reminders: List[Dict[str, Any]] = []
+    if reminders_payload is not None:
+        supabase.table('event_reminders').delete().eq('event_id', event_id).execute()
+        if reminders_payload:
+            reminder_rows = []
+            for reminder in reminders_payload:
+                reminder_rows.append({
+                    'event_id': event_id,
+                    'title': reminder['title'],
+                    'description': reminder.get('description'),
+                    'reminder_date': normalize_reminder_date(reminder['reminder_date'])
+                })
+            insert_result = supabase.table('event_reminders').insert(reminder_rows).execute()
+            if insert_result.data:
+                updated_reminders = insert_result.data
+    else:
+        reminders_query = supabase.table('event_reminders').select('*').eq('event_id', event_id).execute()
+        updated_reminders = reminders_query.data or []
     
     # Si el evento es tipo "Pedido" o "Factura Proforma", actualizar en orders
     event_type_result = supabase.table('event_types').select('name').eq('id', update_data['event_type_id']).execute()
@@ -528,6 +605,7 @@ async def update_event(
                 if event_type_name == 'Factura Comisiones IBERFOODS':
                     supabase.table('orders').update({'status': 'completed'}).eq('id', update_data['linked_order_id']).execute()
     
+    updated_event['reminders'] = updated_reminders
     return CalendarEvent(**updated_event)
 
 @api_router.delete("/calendar/{event_id}")
@@ -741,7 +819,7 @@ app.include_router(api_router)
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
-    allow_origins=os.environ.get('CORS_ORIGINS', '*').split(','),
+    allow_origins=os.environ.get('CORS_ORIGINS', 'http://localhost:3000,http://127.0.0.1:3000').split(','),
     allow_methods=["*"],
     allow_headers=["*"],
 )

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { axiosInstance } from '@/App';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -49,8 +49,11 @@ const CalendarView = ({ user }) => {
   const loadEvents = async () => {
     try {
       const response = await axiosInstance.get('/calendar');
+      console.log('[CalendarView] Events loaded:', response.data);
+      console.log('[CalendarView] First event reminders:', response.data[0]?.reminders);
       setEvents(response.data);
     } catch (error) {
+      console.error('[CalendarView] Error loading events:', error);
       toast.error('Error al cargar eventos');
     }
   };
@@ -171,10 +174,71 @@ const CalendarView = ({ user }) => {
     return eventTypes.find((t) => t.id === eventTypeId);
   };
 
+  const combinedEntries = useMemo(() => {
+    if (!events.length) return [];
+
+    const baseEvents = events.map(event => ({ ...event, __kind: 'event' }));
+    const reminderEntries = events.flatMap(event => {
+      const parentType = eventTypes.find(t => t.id === event.event_type_id);
+      return (event.reminders || []).map(reminder => ({
+        ...reminder,
+        __kind: 'reminder',
+        linked_event_id: event.id,
+        event_id: event.id,
+        title: reminder.title,
+        description: reminder.description,
+        fecha_inicio: reminder.reminder_date,
+        fecha_fin: reminder.reminder_date,
+        event_type_id: 'reminder',
+        parent_event_type_id: event.event_type_id,
+        parent_event_type_name: parentType?.name || 'Evento',
+        parent_event_type_category: parentType?.category || 'event'
+      }));
+    });
+
+    console.log('[CalendarView] Combined entries:', {
+      totalEvents: baseEvents.length,
+      totalReminders: reminderEntries.length,
+      combined: [...baseEvents, ...reminderEntries].length
+    });
+
+    return [...baseEvents, ...reminderEntries];
+  }, [events, eventTypes]);
+
+  const reminderType = useMemo(() => ({
+    id: 'reminder',
+    name: 'Recordatorio',
+    color: '#9F7AEA',
+    category: 'event',
+  }), []);
+
+  const getEntryId = (entry) => {
+    if (entry.__kind === 'event') {
+      return entry.id;
+    }
+    return entry.id ? `reminder-${entry.id}` : `reminder-${entry.event_id}-${entry.reminder_date}`;
+  };
+
+  const isReminderEntry = (entry) => entry.__kind === 'reminder';
+
+  const getEntryType = (entry) => {
+    if (isReminderEntry(entry)) {
+      return reminderType;
+    }
+    return getEventType(entry.event_type_id);
+  };
+
+  const getEntryBadgeLabel = (entry, eventType) => {
+    if (isReminderEntry(entry)) {
+      return `Recordatorio ${entry.parent_event_type_name || 'Evento'}`;
+    }
+    return eventType?.name || 'Evento';
+  };
+
   // Calcula cuántas columnas debe abarcar un evento
-  const getEventSpan = (event, days) => {
-    const eventStart = parseISO(event.fecha_inicio);
-    const eventEnd = parseISO(event.fecha_fin);
+  const getEventSpan = (entry, days) => {
+    const eventStart = parseISO(entry.fecha_inicio);
+    const eventEnd = parseISO(entry.fecha_fin);
     
     // Encontrar en qué día empieza dentro de la vista
     const startDay = days.find(day => isSameDay(day, eventStart));
@@ -196,7 +260,7 @@ const CalendarView = ({ user }) => {
 
   // Obtener eventos que comienzan en cada día (para vista mensual)
   const getEventsStartingOnDay = (day) => {
-    return events.filter(event => isSameDay(parseISO(event.fecha_inicio), day));
+    return combinedEntries.filter(entry => isSameDay(parseISO(entry.fecha_inicio), day));
   };
 
   return (
@@ -318,9 +382,9 @@ const CalendarView = ({ user }) => {
                 const tracks = Array(totalDays).fill(null).map(() => []);
                 const eventTracks = {};
                 
-                const eventSpans = events.map(event => ({
-                  event,
-                  span: getEventSpan(event, days)
+                const eventSpans = combinedEntries.map(entry => ({
+                  entry,
+                  span: getEventSpan(entry, days)
                 })).filter(item => item.span !== null);
                 
                 // Ordenar con criterio estable (ID) para evitar que eventos se muevan
@@ -336,14 +400,16 @@ const CalendarView = ({ user }) => {
                   if (endDiffA !== endDiffB) {
                     return endDiffA - endDiffB;
                   }
-                  // Criterio estable: ordenar por ID para que el orden sea determinístico
-                  return a.event.id.localeCompare(b.event.id);
+                  const idA = getEntryId(a.entry);
+                  const idB = getEntryId(b.entry);
+                  return idA.localeCompare(idB);
                 });
                 
                 // Asignar tracks
-                eventSpans.forEach(({ event, span }) => {
+                eventSpans.forEach(({ entry, span }) => {
                   const startDay = span.startIndex;
                   const endDay = Math.min(span.startIndex + span.span - 1, totalDays - 1);
+                  const entryId = getEntryId(entry);
                   
                   let trackNum = 0;
                   let foundTrack = false;
@@ -360,9 +426,9 @@ const CalendarView = ({ user }) => {
                     
                     if (canUseTrack) {
                       for (let day = startDay; day <= endDay; day++) {
-                        tracks[day][trackNum] = event.id;
+                        tracks[day][trackNum] = entryId;
                       }
-                      eventTracks[event.id] = trackNum;
+                      eventTracks[entryId] = trackNum;
                       foundTrack = true;
                     } else {
                       trackNum++;
@@ -370,19 +436,21 @@ const CalendarView = ({ user }) => {
                   }
                 });
                 
-                return events.map((event, globalIdx) => {
-                  const eventSpan = getEventSpan(event, days);
+                return combinedEntries.map((entry, globalIdx) => {
+                  const eventSpan = getEventSpan(entry, days);
                   if (!eventSpan) return null;
                   
-                  const track = eventTracks[event.id] || 0;
-                  const eventType = getEventType(event.event_type_id);
-                  const duration = differenceInDays(parseISO(event.fecha_fin), parseISO(event.fecha_inicio));
+                  const entryKey = getEntryId(entry);
+                  const track = eventTracks[entryKey] || 0;
+                  const eventType = getEntryType(entry);
+                  const duration = differenceInDays(parseISO(entry.fecha_fin), parseISO(entry.fecha_inicio));
+                  const isReminder = isReminderEntry(entry);
                   
                   const weekRow = Math.floor(eventSpan.startIndex / 7);
                   const dayOfWeek = eventSpan.startIndex % 7;
                   
                   return (
-                    <Popover key={event.id} open={hoveredEventId === event.id} onOpenChange={(open) => !open && setHoveredEventId(null)}>
+                    <Popover key={entryKey} open={hoveredEventId === entryKey} onOpenChange={(open) => !open && setHoveredEventId(null)}>
                       <PopoverTrigger asChild>
                         <div
                           className="p-1.5 rounded-md text-xs font-medium text-white cursor-pointer hover:opacity-90 hover:scale-105 hover:shadow-xl transition-all"
@@ -395,29 +463,38 @@ const CalendarView = ({ user }) => {
                             pointerEvents: 'auto',
                             zIndex: 10 + globalIdx
                           }}
-                        onMouseEnter={() => setHoveredEventId(event.id)}
+                        onMouseEnter={() => setHoveredEventId(entryKey)}
                         onMouseLeave={() => setHoveredEventId(null)}
                         onClick={(e) => {
                           e.stopPropagation();
-                          openEditDialog(event);
+                          if (isReminder) {
+                            const parentEvent = events.find(ev => ev.id === entry.event_id);
+                            if (parentEvent) {
+                              openEditDialog(parentEvent);
+                            }
+                          } else {
+                            openEditDialog(entry);
+                          }
                         }}
-                        data-testid={`event-${event.id}`}
+                        data-testid={`event-${entryKey}`}
                       >
                         <div className="flex items-center justify-between gap-1 h-full">
                           <div className="flex items-center gap-1 flex-1 min-w-0">
-                            {event.linked_order_id && (
+                            {entry.linked_order_id && (
                               <Link2 className="h-3 w-3 flex-shrink-0" />
                             )}
-                            <span className="truncate leading-tight">{event.title}</span>
+                            <span className="truncate leading-tight">
+                              {isReminder ? `🔔 ${entry.title}` : entry.title}
+                            </span>
                           </div>
-                          {duration > 0 && (
+                          {!isReminder && duration > 0 && (
                             <span className="text-xs opacity-90 whitespace-nowrap font-bold leading-tight">
                               {duration + 1}d
                             </span>
                           )}
                         </div>
-                        {event.linked_order_id && (() => {
-                          const linkedOrder = getLinkedOrderInfo(event);
+                        {entry.linked_order_id && (() => {
+                          const linkedOrder = getLinkedOrderInfo(entry);
                           return linkedOrder && (
                             <div className="text-xs opacity-75 truncate leading-tight mt-0.5">
                               #{linkedOrder.order_number} - {linkedOrder.supplier}
@@ -430,12 +507,13 @@ const CalendarView = ({ user }) => {
                       side="right" 
                       className="p-0 w-auto"
                       onOpenAutoFocus={(e) => e.preventDefault()}
-                      onMouseEnter={() => setHoveredEventId(event.id)}
+                      onMouseEnter={() => setHoveredEventId(entryKey)}
                       onMouseLeave={() => setHoveredEventId(null)}
                     >
                       <EventPopover 
-                        event={event} 
+                        event={entry.__kind === 'event' ? entry : events.find(ev => ev.id === entry.event_id) || entry} 
                         eventType={eventType}
+                        reminder={isReminder ? entry : null}
                       />
                     </PopoverContent>
                   </Popover>
@@ -509,8 +587,8 @@ const CalendarView = ({ user }) => {
             >
               {(() => {
                 // Preparar eventos con sus spans dentro de la semana
-                const eventSpans = events
-                  .map((event) => ({ event, span: getEventSpan(event, days) }))
+                const eventSpans = combinedEntries
+                  .map((entry) => ({ entry, span: getEventSpan(entry, days) }))
                   .filter((item) => item.span !== null);
 
                 // Ordenar para asignar tracks de forma determinista y compacta
@@ -533,9 +611,10 @@ const CalendarView = ({ user }) => {
                 const dayAssignments = Array.from({ length: 7 }, () => new Set());
                 const localTrackByEvent = {};
 
-                eventSpans.forEach(({ event, span }) => {
+                eventSpans.forEach(({ entry, span }) => {
                   const startDay = span.startIndex;
                   const endDay = Math.min(span.startIndex + span.span - 1, 6);
+                  const entryId = getEntryId(entry);
 
                   let trackNum = 0;
                   let assigned = false;
@@ -544,16 +623,16 @@ const CalendarView = ({ user }) => {
                     let available = true;
 
                     for (let day = startDay; day <= endDay; day++) {
-                      if (dayAssignments[day].has(trackNum)) {
+                      if (dayAssignments[day].has(`${entryId}-${trackNum}`)) {
                         available = false;
                         break;
                       }
                     }
 
                     if (available) {
-                      localTrackByEvent[event.id] = trackNum;
+                      localTrackByEvent[entryId] = trackNum;
                       for (let day = startDay; day <= endDay; day++) {
-                        dayAssignments[day].add(trackNum);
+                        dayAssignments[day].add(`${entryId}-${trackNum}`);
                       }
                       assigned = true;
                     } else {
@@ -562,15 +641,17 @@ const CalendarView = ({ user }) => {
                   }
                 });
 
-                return eventSpans.map(({ event, span }, index) => {
-                  const localTrack = localTrackByEvent[event.id] ?? 0;
+                return eventSpans.map(({ entry, span }, index) => {
+                  const entryId = getEntryId(entry);
+                  const localTrack = localTrackByEvent[entryId] ?? 0;
                   const startIndex = span.startIndex;
                   const spanLength = span.span;
-                  const eventType = getEventType(event.event_type_id);
-                  const duration = differenceInDays(parseISO(event.fecha_fin), parseISO(event.fecha_inicio));
+                  const eventType = getEntryType(entry);
+                  const duration = differenceInDays(parseISO(entry.fecha_fin), parseISO(entry.fecha_inicio));
+                  const isReminder = isReminderEntry(entry);
 
                   return (
-                    <Popover key={event.id} open={hoveredEventId === event.id} onOpenChange={(open) => !open && setHoveredEventId(null)}>
+                    <Popover key={entryId} open={hoveredEventId === entryId} onOpenChange={(open) => !open && setHoveredEventId(null)}>
                       <PopoverTrigger asChild>
                         <div
                           className="p-2 rounded-lg shadow-lg hover:shadow-2xl transition-all cursor-pointer border-l-4"
@@ -583,23 +664,32 @@ const CalendarView = ({ user }) => {
                             pointerEvents: 'auto',
                             zIndex: 10 + index
                           }}
-                        onMouseEnter={() => setHoveredEventId(event.id)}
+                        onMouseEnter={() => setHoveredEventId(entryId)}
                         onMouseLeave={() => setHoveredEventId(null)}
                         onClick={(e) => {
                           e.stopPropagation();
-                          openEditDialog(event);
+                          if (isReminder) {
+                            const parentEvent = events.find(ev => ev.id === entry.event_id);
+                            if (parentEvent) {
+                              openEditDialog(parentEvent);
+                            }
+                          } else {
+                            openEditDialog(entry);
+                          }
                         }}
-                        data-testid={`event-${event.id}`}
+                        data-testid={`event-${entryId}`}
                       >
                         <div className="mb-1">
                           <div className="flex items-start gap-1.5 mb-1">
-                            {event.linked_order_id && (
+                            {entry.linked_order_id && (
                               <Link2 className="h-4 w-4 text-gray-700 flex-shrink-0 mt-0.5" />
                             )}
-                            <h4 className="font-bold text-gray-900 text-sm line-clamp-1">{event.title}</h4>
+                            <h4 className="font-bold text-gray-900 text-sm line-clamp-1">
+                              {isReminder ? `🔔 ${entry.title}` : entry.title}
+                            </h4>
                           </div>
-                          {event.linked_order_id && (() => {
-                            const linkedOrder = getLinkedOrderInfo(event);
+                          {entry.linked_order_id && (() => {
+                            const linkedOrder = getLinkedOrderInfo(entry);
                             return linkedOrder && (
                               <div className="text-xs text-gray-600 mb-1">
                                 🔗 Pedido #{linkedOrder.order_number} - {linkedOrder.supplier}
@@ -611,18 +701,18 @@ const CalendarView = ({ user }) => {
                               className="text-xs px-2 py-0.5 rounded-full text-white font-medium"
                               style={{ backgroundColor: eventType?.color }}
                             >
-                              {eventType?.name}
+                              {getEntryBadgeLabel(entry, eventType)}
                             </span>
-                            {duration > 0 && (
+                            {!isReminder && duration > 0 && (
                               <span className="text-xs text-gray-600 font-medium">
-                                {format(parseISO(event.fecha_inicio), 'd MMM', { locale: es })} - {format(parseISO(event.fecha_fin), 'd MMM', { locale: es })}
+                                {format(parseISO(entry.fecha_inicio), 'd MMM', { locale: es })} - {format(parseISO(entry.fecha_fin), 'd MMM', { locale: es })}
                               </span>
                             )}
                           </div>
                         </div>
                         
-                        {event.description && (
-                          <p className="text-xs text-gray-700 line-clamp-1">{event.description}</p>
+                        {entry.description && (
+                          <p className="text-xs text-gray-700 line-clamp-1">{entry.description}</p>
                         )}
                       </div>
                     </PopoverTrigger>
@@ -630,12 +720,13 @@ const CalendarView = ({ user }) => {
                       side="right" 
                       className="p-0 w-auto"
                       onOpenAutoFocus={(e) => e.preventDefault()}
-                      onMouseEnter={() => setHoveredEventId(event.id)}
+                      onMouseEnter={() => setHoveredEventId(entryId)}
                       onMouseLeave={() => setHoveredEventId(null)}
                     >
                       <EventPopover 
-                        event={event} 
+                        event={entry.__kind === 'event' ? entry : events.find(ev => ev.id === entry.event_id) || entry} 
                         eventType={eventType}
+                        reminder={isReminder ? entry : null}
                       />
                     </PopoverContent>
                   </Popover>

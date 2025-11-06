@@ -28,6 +28,7 @@ const EventDialog = ({ open, onClose, onSave, onDelete, editingEvent, eventTypes
     linked_order_id: '',
     order_date: '',
   });
+  const [reminders, setReminders] = useState([]);
   const [orders, setOrders] = useState([]);
   const [customFieldKey, setCustomFieldKey] = useState('');
   const [customFieldValue, setCustomFieldValue] = useState('');
@@ -60,6 +61,22 @@ const EventDialog = ({ open, onClose, onSave, onDelete, editingEvent, eventTypes
         linked_order_id: editingEvent.linked_order_id || '',
         order_date: editingEvent.custom_fields?.order_date || '',
       });
+      const mappedReminders = (editingEvent.reminders || []).map((reminder) => {
+        let reminderDate = reminder.reminder_date || '';
+        try {
+          const parsed = parseISO(reminderDate);
+          reminderDate = format(parsed, 'yyyy-MM-dd');
+        } catch (error) {
+          console.error('Error parsing reminder date:', error);
+          reminderDate = '';
+        }
+        return {
+          title: reminder.title || '',
+          description: reminder.description || '',
+          reminder_date: reminderDate,
+        };
+      });
+      setReminders(mappedReminders);
     } else {
       resetForm();
     }
@@ -95,6 +112,7 @@ const EventDialog = ({ open, onClose, onSave, onDelete, editingEvent, eventTypes
     });
     setCustomFieldKey('');
     setCustomFieldValue('');
+    setReminders([]);
   };
 
   const getSelectedEventTypeName = () => {
@@ -175,6 +193,18 @@ const EventDialog = ({ open, onClose, onSave, onDelete, editingEvent, eventTypes
       }
     }
 
+    if (reminders.length) {
+      payload.reminders = reminders
+        .filter((reminder) => reminder.title && reminder.reminder_date)
+        .map((reminder) => ({
+          title: reminder.title,
+          description: reminder.description || null,
+          reminder_date: reminder.reminder_date,
+        }));
+    } else {
+      payload.reminders = [];
+    }
+
     return payload;
   };
 
@@ -214,6 +244,25 @@ const EventDialog = ({ open, onClose, onSave, onDelete, editingEvent, eventTypes
     const newFields = { ...formData.custom_fields };
     delete newFields[key];
     setFormData({ ...formData, custom_fields: newFields });
+  };
+
+  const addReminder = () => {
+    setReminders((prev) => [
+      ...prev,
+      {
+        title: '',
+        description: '',
+        reminder_date: format(new Date(), 'yyyy-MM-dd'),
+      },
+    ]);
+  };
+
+  const updateReminder = (index, key, value) => {
+    setReminders((prev) => prev.map((reminder, idx) => (idx === index ? { ...reminder, [key]: value } : reminder)));
+  };
+
+  const removeReminder = (index) => {
+    setReminders((prev) => prev.filter((_, idx) => idx !== index));
   };
 
   return (
@@ -466,41 +515,68 @@ const EventDialog = ({ open, onClose, onSave, onDelete, editingEvent, eventTypes
             </div>
           )}
 
-          <div className="space-y-3">
-            <Label>Campos Personalizados</Label>
-            <div className="flex gap-2">
-              <Input
-                placeholder="Campo"
-                data-testid="custom-field-key-input"
-                value={customFieldKey}
-                onChange={(e) => setCustomFieldKey(e.target.value)}
-              />
-              <Input
-                placeholder="Valor"
-                data-testid="custom-field-value-input"
-                value={customFieldValue}
-                onChange={(e) => setCustomFieldValue(e.target.value)}
-              />
-              <Button type="button" onClick={addCustomField} data-testid="add-custom-field-button">
-                <Plus className="h-4 w-4" />
+          {/* Recordatorios asociados */}
+          <div className="space-y-3 border border-slate-200 rounded-lg p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-medium text-slate-900">Recordatorios adicionales</h3>
+                <p className="text-xs text-slate-500">Programa avisos automáticos para este evento.</p>
+              </div>
+              <Button type="button" variant="outline" size="sm" onClick={addReminder} data-testid="event-add-reminder">
+                <Plus className="w-4 h-4 mr-2" /> Añadir recordatorio
               </Button>
             </div>
-            {Object.keys(formData.custom_fields).length > 0 && (
-              <div className="space-y-2 p-3 bg-gray-50 rounded-lg">
-                {Object.entries(formData.custom_fields).map(([key, value]) => (
-                  <div key={key} className="flex justify-between items-center" data-testid={`custom-field-${key}`}>
-                    <span className="text-sm">
-                      <strong>{key}:</strong> {value}
-                    </span>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => removeCustomField(key)}
-                      data-testid={`remove-custom-field-${key}`}
-                    >
-                      <Trash2 className="h-4 w-4 text-red-500" />
-                    </Button>
+
+            {reminders.length === 0 ? (
+              <p className="text-xs text-slate-500">No hay recordatorios añadidos.</p>
+            ) : (
+              <div className="space-y-4">
+                {reminders.map((reminder, index) => (
+                  <div key={`reminder-${index}`} className="space-y-3 rounded-md border border-slate-200 p-3 bg-slate-50">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold text-slate-600">Recordatorio #{index + 1}</span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => removeReminder(index)}
+                        aria-label={`Eliminar recordatorio ${index + 1}`}
+                        data-testid={`event-remove-reminder-${index}`}
+                      >
+                        <Trash2 className="w-4 h-4 text-red-500" />
+                      </Button>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <div className="space-y-2">
+                        <Label className="text-xs" htmlFor={`reminder-title-${index}`}>Título</Label>
+                        <Input
+                          id={`reminder-title-${index}`}
+                          value={reminder.title}
+                          onChange={(e) => updateReminder(index, 'title', e.target.value)}
+                          placeholder="Ej: Llamar al cliente"
+                          required
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs" htmlFor={`reminder-date-${index}`}>Fecha y hora</Label>
+                        <Input
+                          id={`reminder-date-${index}`}
+                          type="date"
+                          value={reminder.reminder_date}
+                          onChange={(e) => updateReminder(index, 'reminder_date', e.target.value)}
+                          required
+                        />
+                      </div>
+                      <div className="space-y-2 md:col-span-1">
+                        <Label className="text-xs" htmlFor={`reminder-description-${index}`}>Descripción</Label>
+                        <Input
+                          id={`reminder-description-${index}`}
+                          value={reminder.description}
+                          onChange={(e) => updateReminder(index, 'description', e.target.value)}
+                          placeholder="Detalles opcionales"
+                        />
+                      </div>
+                    </div>
                   </div>
                 ))}
               </div>
