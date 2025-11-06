@@ -625,7 +625,7 @@ const CalendarView = ({ user }) => {
                     let available = true;
 
                     for (let day = startDay; day <= endDay; day++) {
-                      if (dayAssignments[day].has(`${entryId}-${trackNum}`)) {
+                      if (dayAssignments[day].has(trackNum)) {
                         available = false;
                         break;
                       }
@@ -634,7 +634,7 @@ const CalendarView = ({ user }) => {
                     if (available) {
                       localTrackByEvent[entryId] = trackNum;
                       for (let day = startDay; day <= endDay; day++) {
-                        dayAssignments[day].add(`${entryId}-${trackNum}`);
+                        dayAssignments[day].add(trackNum);
                       }
                       assigned = true;
                     } else {
